@@ -1,7 +1,9 @@
 """Integration tests for CLI functionality with actual conversions."""
 
+import pathlib
 import subprocess
 import sys
+import tempfile
 
 
 def run_cli(args: list[str], input_html: str) -> str:
@@ -196,3 +198,68 @@ def test_cli_help_includes_new_options() -> None:
 
     # Check for Discord mention
     assert "Discord" in help_text or "2" in help_text
+
+    # Check for source_encoding option in help
+    assert "--source_encoding" in help_text
+
+
+def test_cli_source_encoding_with_stdin() -> None:
+    """Test that source_encoding is ignored when using stdin."""
+    html = "<html><body><h1>Test with stdin</h1></body></html>"
+    # The encoding option should be ignored for stdin input
+    output = run_cli(["--source_encoding", "utf-8", "--no-extract-metadata"], html)
+    assert "Test with stdin" in output
+
+
+def test_cli_source_encoding_with_file() -> None:
+    """Test source_encoding with an actual file."""
+    # Create a temporary file with UTF-8 encoding
+    html_content = "<html><body><h1>Tëst with special çharacters: ñáéíóú</h1></body></html>"
+
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False, suffix=".html") as f:
+        f.write(html_content)
+        temp_file = f.name
+
+    try:
+        # Run CLI with source_encoding specified
+        result = subprocess.run(
+            [sys.executable, "-m", "html_to_markdown", temp_file, "--source_encoding", "utf-8", "--no-extract-metadata"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        output = result.stdout
+        assert "Tëst with special çharacters" in output
+        assert "ñáéíóú" in output
+
+    finally:
+        # Clean up the temporary file
+        pathlib.Path(temp_file).unlink()
+
+
+def test_cli_source_encoding_invalid_encoding() -> None:
+    """Test that invalid encoding produces an error."""
+    html_content = "<html><body><h1>Test content</h1></body></html>"
+
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False, suffix=".html") as f:
+        f.write(html_content)
+        temp_file = f.name
+
+    try:
+        # Run CLI with invalid encoding
+        result = subprocess.run(
+            [sys.executable, "-m", "html_to_markdown", temp_file, "--source_encoding", "invalid-encoding"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        # Should return non-zero exit code
+        assert result.returncode != 0
+        # Should contain error about invalid encoding
+        assert "encoding" in result.stderr.lower() or "invalid" in result.stderr.lower()
+
+    finally:
+        # Clean up the temporary file
+        pathlib.Path(temp_file).unlink()
