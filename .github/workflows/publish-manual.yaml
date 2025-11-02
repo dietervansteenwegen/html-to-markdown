@@ -1,0 +1,27 @@
+name: Publish Release (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g., v2.6.0)"
+        required: true
+        type: string
+      build_run_id:
+        description: "Workflow run ID from the Build Artifacts workflow"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run (validate artifacts without publishing)"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish.yaml
+    with:
+      tag: ${{ inputs.tag }}
+      build_run_id: ${{ inputs.build_run_id }}
+      dry_run: ${{ inputs.dry_run }}
+    secrets: inherit

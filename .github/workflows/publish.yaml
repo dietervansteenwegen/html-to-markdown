@@ -1,18 +1,15 @@
 name: Publish Release
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       tag:
-        description: "Release tag to publish (e.g., v2.6.0)"
         required: true
         type: string
       build_run_id:
-        description: "Workflow run ID from the Build Artifacts workflow"
         required: true
         type: string
       dry_run:
-        description: "Dry run (validate artifacts without publishing)"
         required: false
         type: boolean
         default: true
@@ -21,13 +18,13 @@ on:
     types: [completed]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_run_id || github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.build_run_id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   gather:
     name: Load release metadata
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name == 'workflow_call' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.read.outputs.tag }}
@@ -39,7 +36,7 @@ jobs:
       - name: Determine build run
         id: build_run
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
             id="${{ inputs.build_run_id }}"
             if [ -z "$id" ]; then
               echo "build_run_id input is required when manually dispatching this workflow." >&2
@@ -79,7 +76,7 @@ PY >> "$GITHUB_OUTPUT"
       - name: Determine dry-run flag
         id: dryrun
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
             if [ "${{ inputs.tag }}" != "${{ steps.read.outputs.tag }}" ]; then
               echo "Specified tag '${{ inputs.tag }}' does not match metadata tag '${{ steps.read.outputs.tag }}'." >&2
               exit 1
