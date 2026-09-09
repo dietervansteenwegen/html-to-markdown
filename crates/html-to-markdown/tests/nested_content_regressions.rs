@@ -103,3 +103,36 @@ fn nested_table_wrapper_preserves_balanced_visitor_callbacks() {
     assert_eq!(result.content.unwrap(), "| A | B |\n| --- | --- |\n");
     assert_eq!(visitor.lock().unwrap().events, ["start", "start", "end", "end"]);
 }
+
+#[test]
+fn deeply_nested_wrappers_preserve_surrounding_content_and_depth_warning() {
+    const WRAPPER_COUNT: usize = 20;
+    const MAX_DEPTH: usize = 8;
+    const MAX_OUTPUT_BYTES: usize = 256;
+    let mut html = String::from("<p>Before</p>");
+    html.push_str(&"<table><tr><td>".repeat(WRAPPER_COUNT));
+    html.push_str("Leaf");
+    html.push_str(&"</td></tr></table>".repeat(WRAPPER_COUNT));
+    html.push_str("<p>After</p>");
+    let options = ConversionOptions {
+        max_depth: Some(MAX_DEPTH),
+        compact_tables: true,
+        include_document_structure: true,
+        ..Default::default()
+    };
+    let result = convert(&html, Some(options)).unwrap();
+    let content = result.content.unwrap();
+    assert!(content.starts_with("Before\n"));
+    assert!(content.ends_with("After\n"));
+    assert!(
+        content.contains("| --- |"),
+        "the truncated table must still render its structure: {content}"
+    );
+    assert!(content.len() < MAX_OUTPUT_BYTES);
+    assert_eq!(result.warnings.len(), 1);
+    assert_eq!(
+        result.warnings[0].kind,
+        html_to_markdown_rs::WarningKind::DepthLimitExceeded
+    );
+    assert!(!result.tables.is_empty());
+}

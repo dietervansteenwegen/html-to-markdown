@@ -202,7 +202,11 @@ pub fn handle_table(
         }
 
         let table_scan = scan_table(node_handle, parser, dom_ctx);
-        let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan);
+        // Keep the normal table renderer at the traversal boundary: it emits the
+        // truncated table structure and records the usual depth-limit warning.
+        let wrapper_cell = nested_table_wrapper_cell(tag, parser, &table_scan).filter(|(_, cell_depth)| {
+            depth + cell_depth + 1 < crate::converter::main_helpers::effective_max_depth(options)
+        });
         let row_count = table_scan.row_counts.len();
         let mut distinct_counts: Vec<_> = table_scan.row_counts.iter().copied().filter(|c| *c > 0).collect();
         distinct_counts.sort_unstable();
