@@ -212,9 +212,8 @@ fn should_keep_the_tier1_fast_path_when_a_borderless_table_has_no_spanning_cell(
 
 #[test]
 fn should_keep_the_tier1_fast_path_when_a_table_contains_exactly_one_nested_table() {
-    // ~keep Tier-2's threshold is `nested_table_count > 1`; a single nested table is
-    // ~keep explicitly not a layout table (issue #13 — a straight chain of
-    // ~keep one-table-per-cell tables must keep the GFM path).
-    let html = "<table><tr><td><table><tr><td>x</td></tr></table></td></tr></table>";
+    // A single nested table in a multi-cell row keeps the GFM fast path.
+    // Single-cell wrappers instead fall back to Tier-2's unwrapping (#478).
+    let html = "<table><tr><td><table><tr><td>x</td></tr></table></td><td>Other</td></tr></table>";
     assert_tier1_takes_the_fast_path(html, "one nested table");
 }

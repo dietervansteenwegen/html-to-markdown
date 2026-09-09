@@ -1587,7 +1587,7 @@ struct TableLayoutProbe {
 }
 
 fn open_table(state: &mut Tier1State, attrs: &[(&[u8], Option<&[u8]>)], table_probes: &mut Vec<TableLayoutProbe>) {
-    // ~keep Phase HH: nested tables are no longer a bail; an inner table inherits
+    // ~keep Phase HH: nested tables are accumulated natively; an inner table inherits
     // ~keep `inline_mode = true` so its final GFM rendering writes into the parent
     // ~keep cell buffer rather than `state.output`.  The parent cell's newline
     // ~keep collapse then flattens the inner table to a single inline run.
@@ -3249,6 +3249,17 @@ fn close_table(
     // ~keep When a <caption> is present, Tier-2 always takes the GFM path
     // ~keep regardless of <th> presence (has_caption short-circuits the layout check).
     let has_caption = ts.caption_text.is_some();
+    // One-cell wrappers are unwrapped by Tier-2 to preserve the nested table's
+    // structure. Its DOM walker also handles the traversal-depth boundary.
+    if !ts.has_th
+        && !has_caption
+        && !probe.has_span
+        && probe.nested_table_count > 0
+        && ts.rows.len() == 1
+        && ts.first_row_col_count == Some(1)
+    {
+        return Err(BailReason::TableNestedTable);
+    }
     if !ts.has_th && !has_caption {
         // ~keep No <th> and no <caption>: check if Tier-2 would take the layout path.
         let row_count = ts.rows.len();

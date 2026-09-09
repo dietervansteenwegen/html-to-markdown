@@ -124,11 +124,11 @@ fn should_handle_list_in_table_cell() {
 // ~keep markdown.  The parent cell's newline collapse then squashes the inner
 // ~keep table's `\n`-separated rows into a single inline run, matching Tier-2.
 // ~keep The `TableNestedTable` bail variant is retained for back-compat but is
-// ~keep no longer reachable from the scanner.
+// ~keep used for single-cell layout wrappers, which Tier-2 unwraps (issue #478).
 
 #[test]
 fn should_handle_nested_table_inside_cell() {
-    let html = "<table><tr><td><table><tr><td>inner</td></tr></table></td></tr></table>";
+    let html = "<table><tr><td><table><tr><td>inner</td></tr></table></td><td>Other</td></tr></table>";
     let t1 = tier1_run(html).expect("Tier-1 should not bail on nested <table> (Phase HH)");
     let t2 = tier2(html);
     // ~keep The two tiers still intentionally diverge on the pre-existing separator-row
@@ -148,6 +148,20 @@ fn should_handle_nested_table_inside_cell() {
         t2.starts_with(r"| \| inner \| \| ----- \| |") && t2.ends_with('\n'),
         "Tier-2 outer row content must include the flattened, pipe-escaped nested table; got: {t2:?}"
     );
+}
+
+#[test]
+fn should_fall_back_for_single_cell_nested_table_wrappers() {
+    let html = "<table><tr><td><table><tr><td>inner</td></tr></table></td></tr></table>";
+    assert!(matches!(tier1_run(html), Err(BailReason::TableNestedTable)));
+    let expected = "| inner |\n| ----- |\n";
+    assert_eq!(tier2(html), expected);
+    assert_eq!(force_tier1(html), expected);
+    let options = ConversionOptions {
+        extract_metadata: false,
+        ..Default::default()
+    };
+    assert_eq!(convert(html, Some(options)).unwrap().content.unwrap(), expected);
 }
 
 // ~keep ── TableCaption ──────────────────────────────────────────────────────────────
