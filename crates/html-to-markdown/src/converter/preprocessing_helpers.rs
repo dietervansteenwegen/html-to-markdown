@@ -21,6 +21,8 @@ pub fn inline_ancestor_allows_block(tag_name: &str) -> bool {
 /// ~keep instead, since each scan only ever needs the *nearest* qualifying ancestor.
 #[derive(Clone, Copy)]
 struct MisnestState {
+    /// True if a strict ancestor is an anchor.
+    inside_anchor: bool,
     /// True if this node or any strict ancestor is `<pre>`/`<code>`.
     inside_preformatted: bool,
     /// True if any strict ancestor is an inline element that disallows block children.
@@ -34,6 +36,7 @@ struct MisnestState {
 
 impl MisnestState {
     const ROOT: Self = Self {
+        inside_anchor: false,
         inside_preformatted: false,
         blocked_by_inline_ancestor: false,
         p_ancestor_state: false,
@@ -41,7 +44,10 @@ impl MisnestState {
     };
 }
 
-/// Detect block elements that were incorrectly nested under inline ancestors.
+/// Detect malformed nesting that requires HTML5 tree repair.
+///
+/// Nested anchors must be closed by the HTML5 adoption agency algorithm so their
+/// destinations remain separate Markdown links (issue #479).
 ///
 /// Excludes elements inside `<pre>` or `<code>` blocks, as they have special
 /// whitespace preservation rules and should not be repaired.
@@ -90,6 +96,10 @@ pub fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bo
             continue;
         };
 
+        if info.name == "a" && state.inside_anchor && !state.inside_preformatted {
+            return true;
+        }
+
         // ~keep Table elements under <p>: tl misparsed an unclosed <p> in <td>.
         if matches!(info.name.as_str(), "td" | "tr" | "th") && state.p_ancestor_state {
             return true;
@@ -119,6 +129,7 @@ pub fn has_inline_block_misnest(dom_ctx: &DomContext, parser: &tl::Parser) -> bo
             }
 
             let child_state = MisnestState {
+                inside_anchor: state.inside_anchor || info.name == "a",
                 inside_preformatted: self_inside_preformatted,
                 blocked_by_inline_ancestor: state.blocked_by_inline_ancestor
                     || (is_inline_element(&info.name) && !inline_ancestor_allows_block(&info.name)),

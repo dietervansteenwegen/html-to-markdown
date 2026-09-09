@@ -178,10 +178,10 @@ pub fn trim_line_end_whitespace(output: &mut String) {
     }
 }
 
-/// Check if HTML contains custom element tags.
+/// Check for custom elements or paragraphs misnested inside namespaced elements.
 pub fn has_custom_element_tags(html: &str) -> bool {
     // ~keep Custom elements must have a hyphen in their TAG NAME, not in attributes.
-    // ~keep Look for patterns like <foo-bar> or </foo-bar>.
+    // ~keep Namespaced Office tags also need HTML5 repair when paragraphs are misnested.
     // ~keep A markup declaration/comment (`<!...>`), a processing instruction (`<?...?>`),
     // ~keep or a CDATA section is NOT a tag — its "name" is arbitrary content that may
     // ~keep itself contain a hyphen (`<!--c-->` naively yields `!--c--`, which contains
@@ -193,6 +193,7 @@ pub fn has_custom_element_tags(html: &str) -> bool {
     let bytes = html.as_bytes();
     let len = bytes.len();
     let mut i = 0;
+    let mut namespaced_tags = Vec::new();
 
     while i < len {
         if bytes[i] != b'<' {
@@ -234,13 +235,42 @@ pub fn has_custom_element_tags(html: &str) -> bool {
             tag_end += 1;
         }
 
-        if bytes[tag_start..tag_end].contains(&b'-') {
+        let name = &bytes[tag_start..tag_end];
+        if name.contains(&b'-') {
             return true;
         }
-
-        i = tag_end;
+        let (self_closing, terminator) = scan_tag_terminator(bytes, tag_end);
+        if namespaced_paragraph_is_misnested(&mut namespaced_tags, name, next == b'/', self_closing) {
+            return true;
+        }
+        i = terminator.saturating_add(if self_closing { 2 } else { 1 });
     }
 
+    false
+}
+
+/// Track only namespace subtrees, leaving well-formed Office documents on the normal parser path.
+fn namespaced_paragraph_is_misnested<'a>(
+    open_tags: &mut Vec<&'a [u8]>,
+    name: &'a [u8],
+    closing: bool,
+    self_closing: bool,
+) -> bool {
+    if closing {
+        if name.contains(&b':') {
+            if let Some(position) = open_tags.iter().rposition(|open| open.eq_ignore_ascii_case(name)) {
+                let unclosed_paragraph = open_tags[position + 1..]
+                    .iter()
+                    .any(|open| open.eq_ignore_ascii_case(b"p"));
+                open_tags.truncate(position);
+                return unclosed_paragraph;
+            }
+        } else if open_tags.last().is_some_and(|open| open.eq_ignore_ascii_case(name)) {
+            open_tags.pop();
+        }
+    } else if !self_closing && (!open_tags.is_empty() || name.contains(&b':')) && !is_html5_void_element(name) {
+        open_tags.push(name);
+    }
     false
 }
 
@@ -742,6 +772,16 @@ mod tests {
         assert!(!has_custom_element_tags("<!--c-->"));
         assert!(!has_custom_element_tags("<p><!-- a routine comment --></p>"));
         assert!(!has_custom_element_tags("<!-- multiple -- dashes -- here -->"));
+    }
+
+    #[test]
+    fn should_detect_namespaced_elements_for_html5_repair() {
+        assert!(has_custom_element_tags("<o:p><P></o:p></P>"));
+        assert!(!has_custom_element_tags("<o:p><P></P></o:p>"));
+        assert!(!has_custom_element_tags("<o:p>Office text</o:p>"));
+        assert!(!has_custom_element_tags("<o:p/><P>text</P>"));
+        assert!(!has_custom_element_tags("<!-- <o:p>comment</o:p> -->"));
+        assert!(!has_custom_element_tags("<div title='o:p'>text</div>"));
     }
 
     #[test]

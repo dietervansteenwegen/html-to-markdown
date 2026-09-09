@@ -53,7 +53,7 @@
     "id": "options_br_in_tables_nested_table_rows",
     "description": "A nested table flattened into a cell keeps its row boundaries as literal <br> when br_in_tables is enabled",
     "input": {
-      "html": "<table><tr><td><p>Before</p><table><tr><th>ID</th><th>Status</th></tr><tr><td>123</td><td>Done</td></tr></table></td></tr></table>",
+      "html": "<table><tr><td><p>Before</p><table><tr><th>ID</th><th>Status</th></tr><tr><td>123</td><td>Done</td></tr></table></td><td>Other</td></tr></table>",
       "options": {
         "br_in_tables": true,
         "compact_tables": true
@@ -76,6 +76,29 @@
       "topic": "options",
       "stem": "options_br_in_tables_nested_table_rows",
       "title": "A flattened nested table keeps its row boundaries under br_in_tables"
+    }
+  },
+  {
+    "id": "options_br_in_tables_nested_data_table",
+    "description": "A single-cell layout wrapper preserves its nested data table as structured Markdown",
+    "input": {
+      "html": "<table><tr><td><p>Before</p><table><tr><th>ID</th><th>Status</th></tr><tr><td>123</td><td>Done</td></tr></table></td></tr></table>",
+      "options": {
+        "br_in_tables": true,
+        "compact_tables": true
+      }
+    },
+    "assertions": [
+      {
+        "type": "equals",
+        "field": "content",
+        "value": "Before\n\n| ID | Status |\n| --- | --- |\n| 123 | Done |\n"
+      }
+    ],
+    "docs": {
+      "topic": "options",
+      "stem": "options_br_in_tables_nested_data_table",
+      "title": "A single-cell layout wrapper preserves its nested data table"
     }
   }
 ]

@@ -7,6 +7,34 @@ All notable changes to html-to-markdown will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.3] - 2026-09-09
+
+### Fixed
+
+- Preserve visible images inside `font-size: 0` wrappers ([#476](https://github.com/xberg-io/html-to-markdown/issues/476)).
+- Recover table cells following malformed Office namespace tags
+  ([#477](https://github.com/xberg-io/html-to-markdown/issues/477)).
+- Render data tables inside one-cell layout wrappers as separate Markdown tables
+  ([#478](https://github.com/xberg-io/html-to-markdown/issues/478)).
+- Repair nested anchors so both link destinations remain clickable
+  ([#479](https://github.com/xberg-io/html-to-markdown/issues/479)).
+- Resolve unpublished native Node packages from the workspace during frozen documentation installs.
+- Build prerelease PHP extensions against the local Rust core and committed dependency lockfile.
+- Preserve native error codes on typed C# conversion exceptions.
+- Prevent panics when nested list visitors shorten earlier output or replace it with multibyte text
+  ([#474](https://github.com/xberg-io/html-to-markdown/issues/474)).
+- Generate R and Ruby bindings that pass strict Clippy checks while preserving visitor and conversion behavior.
+- Accept explicit `nil` for optional Ruby conversion fields.
+- Use canonical URL-escape enum values in fixtures so Node and WebAssembly suites regenerate completely.
+- Point Ruby dependency-update tasks at the native crate and remove the obsolete duplicate Rust workspace.
+
+### Changed
+
+- Refactor MCP helpers, image construction, and visitor state to remove three lint suppressions while preserving
+  preprocessing validation order ([#466](https://github.com/xberg-io/html-to-markdown/pull/466)).
+- Regenerate all bindings, end-to-end suites, and snippets with Alef 0.85.10.
+- Refresh dependency lockfiles across Rust workspaces.
+
 ## [3.11.1] - 2026-08-15
 
 ### Upgrade note — the C ABI changed

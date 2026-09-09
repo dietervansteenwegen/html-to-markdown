@@ -170,9 +170,9 @@ checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
 
 [[package]]
 name = "html-to-markdown-rs"
-version = "3.12.0"
+version = "3.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fd381d291246b2df83535a2f2896dc32633a4cb69a14861f29f9dc0c7fbab77"
+checksum = "0ac73efac6c5cfc74fc27c6e41d82573609e23d20032bf6e8993fb0f036fd0f5"
 dependencies = [
  "ahash",
  "astral-tl",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "html_to_markdown_rs-e2e-rust"
-version = "3.12.0"
+version = "3.12.2"
 dependencies = [
  "html-to-markdown-rs",
  "serde_json",
@@ -260,9 +260,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.30"
+version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "616ec5685824bcc94416c6d4a7a446eea774a31efd7062c8480ba6fd06d7a6e5"
+checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "markup5ever"
