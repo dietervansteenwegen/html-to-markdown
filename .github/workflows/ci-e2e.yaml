@@ -240,6 +240,16 @@ jobs:
       - name: Install alef
         uses: xberg-io/actions/install-alef@v1
 
+      # ~keep Alef delegates C# formatting to Poly's clang-format adapter. Ubuntu's clang-format
+      # 18 leaves nullable switch assertions unformatted; pin the generator's local formatter
+      # version so freshness compares fixture changes rather than formatter-version differences.
+      - name: Setup generation formatter
+        uses: xberg-io/actions/setup-c-cpp-tools@v1
+        with:
+          clang-format-version: "23.1.0"
+          install-cppcheck: "false"
+          install-shellcheck: "false"
+
       # ~keep `alef e2e generate` formats every suite it emits by shelling out to poly. With
       # poly absent this job failed all 16 languages with "poly not found on PATH" before the
       # drift check below ever ran, so the gate could not report on the drift it exists to catch.
