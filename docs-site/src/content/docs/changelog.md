@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor MCP helpers, image construction, and visitor state to remove three lint suppressions while preserving
   preprocessing validation order ([#466](https://github.com/xberg-io/html-to-markdown/pull/466)).
-- Regenerate all bindings, end-to-end suites, and snippets with Alef 0.85.10.
+- Regenerate all bindings, end-to-end suites, and snippets with Alef 0.85.11.
 - Refresh dependency lockfiles across Rust workspaces.
 
 ## [3.11.1] - 2026-08-15
