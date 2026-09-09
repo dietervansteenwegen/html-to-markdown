@@ -4,7 +4,7 @@
 //! Regression tests for issue #469: with `br_in_tables: true`, a nested table inside a cell
 //! lost its row boundaries entirely.
 //!
-//! A GFM cell cannot contain a nested table, so the inner table is flattened into the outer
+//! A multi-cell GFM table cannot contain a nested table, so the inner table is flattened into the outer
 //! cell and its pipes escaped (`ee77eb2a18`). Until 3.11.2 `br_in_tables: true` merely
 //! *skipped* the whole-cell newline fold, so the inner rows leaked out of the cell as raw
 //! newlines — malformed, but a GFM parser could still see two rows. `bb67a022b3` made that
@@ -17,11 +17,12 @@
 //! survive without a raw newline ever reaching the cell.
 //!
 //! This restores row boundaries, not table structure — a real nested GFM table remains
-//! impossible and the inner pipes stay escaped.
+//! impossible and the inner pipes stay escaped. Single-cell layout wrappers are instead
+//! unwrapped to preserve their inner data tables (issue #478); those have separate coverage.
 
 use html_to_markdown_rs::{ConversionOptions, convert};
 
-const NESTED: &str = "<table><tr><td><p>Before</p><table><tr><th>ID</th><th>Status</th></tr><tr><td>123</td><td>Done</td></tr></table></td></tr></table>";
+const NESTED: &str = "<table><tr><td><p>Before</p><table><tr><th>ID</th><th>Status</th></tr><tr><td>123</td><td>Done</td></tr></table></td><td>Other</td></tr></table>";
 
 fn content(html: &str, options: ConversionOptions) -> String {
     convert(html, Some(options)).unwrap().content.unwrap_or_default()
