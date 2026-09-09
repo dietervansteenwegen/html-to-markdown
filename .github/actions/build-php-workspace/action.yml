@@ -1,0 +1,48 @@
+name: Build workspace PHP extension
+description: Build the unreleased PHP extension against the locked local Rust core
+
+outputs:
+  extension-path:
+    description: Path to the built native PHP extension
+    value: ${{ steps.build.outputs.extension-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install LLVM for libclang
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        choco install llvm --version=18.1.8 --allow-downgrade -y
+        if ($LASTEXITCODE -ne 0) {
+          throw "LLVM installation failed with exit code $LASTEXITCODE"
+        }
+        $llvmPath = "C:\Program Files\LLVM\bin"
+        if (-not (Test-Path (Join-Path $llvmPath "libclang.dll"))) {
+          throw "libclang.dll not found in LLVM installation"
+        }
+        "LIBCLANG_PATH=$llvmPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        $llvmPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Build from the workspace
+      id: build
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS" in
+          Linux) library=libhtml_to_markdown_php.so ;;
+          macOS) library=libhtml_to_markdown_php.dylib ;;
+          Windows)
+            library=html_to_markdown_php.dll
+            export RUSTC_BOOTSTRAP=1
+            export CFLAGS_x86_64_pc_windows_msvc=/MD
+            export CXXFLAGS_x86_64_pc_windows_msvc=/MD
+            ;;
+          *) echo "Unsupported PHP build platform: $RUNNER_OS" >&2; exit 1 ;;
+        esac
+        cargo build --release --locked --package html-to-markdown-php
+        test -f "target/release/$library"
+        extension_path="$GITHUB_WORKSPACE/target/release/$library"
+        echo "extension-path=$extension_path" >> "$GITHUB_OUTPUT"

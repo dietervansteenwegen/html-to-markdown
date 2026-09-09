@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repair nested anchors so both link destinations remain clickable
   ([#479](https://github.com/xberg-io/html-to-markdown/issues/479)).
 - Resolve unpublished native Node packages from the workspace during frozen documentation installs.
+- Build prerelease PHP extensions against the local Rust core and committed dependency lockfile.
 - Prevent panics when nested list visitors shorten earlier output or replace it with multibyte text
   ([#474](https://github.com/xberg-io/html-to-markdown/issues/474)).
 - Generate R and Ruby bindings that pass strict Clippy checks while preserving visitor and conversion behavior.
