@@ -147,7 +147,7 @@ pub fn convert_html_impl(
         if let Some(repaired_html) = repair_with_html5ever(&preprocessed) {
             tracing::warn!(
                 target: "html_to_markdown::convert",
-                "block-level element misnested under an inline ancestor; re-parsed with html5ever repair"
+                "misnested HTML elements detected; re-parsed with html5ever repair"
             );
             drop(dom);
             let stripped = strip_script_and_style_tags(&repaired_html);

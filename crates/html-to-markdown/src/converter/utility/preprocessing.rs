@@ -1400,7 +1400,7 @@ pub fn sanitize_markdown_url(url: &str) -> Cow<'_, str> {
 ///
 /// `font-size: 0` is the one conditional case — it is also a spacing hack whose children
 /// restore a readable size — so its subtree is kept when a descendant re-declares a non-zero
-/// `font-size` (issue #468).
+/// `font-size` or contains an image, whose intrinsic size is independent of font size (issues #468, #476).
 ///
 /// Scans for opening tags matching either condition, finds their matching
 /// closing tag, and removes the entire element (tag + content, so nested
@@ -1580,7 +1580,7 @@ fn hidden_element_remove_end(bytes: &[u8], idx: usize, tag_end: usize, len: usiz
 /// the element must be kept.
 ///
 /// The `hidden` attribute and a definitive `display`/`visibility` declaration remove the
-/// subtree outright. `font-size: 0` only does so when no descendant restores a non-zero size.
+/// subtree outright. `font-size: 0` must preserve images and descendants that restore a readable size.
 fn hidden_element_removal_end(input: &str, bytes: &[u8], idx: usize, tag_end: usize, len: usize) -> Option<usize> {
     let tag_slice = &input[idx..tag_end];
     if tag_has_hidden_attribute(tag_slice) {
@@ -1589,10 +1589,13 @@ fn hidden_element_removal_end(input: &str, bytes: &[u8], idx: usize, tag_end: us
     match hidden_style_reason(tag_slice)? {
         HiddenStyleReason::Definitive => Some(hidden_element_remove_end(bytes, idx, tag_end, len)),
         HiddenStyleReason::FontSizeZero => {
+            if matches_tag_start(bytes, idx + 1, b"img") {
+                return None;
+            }
             let remove_end = hidden_element_remove_end(bytes, idx, tag_end, len);
             // ~keep Scan past the element's own open tag so its `font-size: 0` is not re-read.
             let subtree = input.get(tag_end..remove_end).unwrap_or("");
-            (!region_declares_non_zero_font_size(subtree)).then_some(remove_end)
+            (!region_restores_visible_content(subtree)).then_some(remove_end)
         }
     }
 }
@@ -1846,21 +1849,30 @@ fn tag_sets_non_zero_font_size(tag: &str) -> bool {
     scan_visibility_declarations(style_value).2 == Some(false)
 }
 
-/// Whether any opening tag in `region` re-declares a non-zero `font-size`.
+/// Whether `region` contains an image or re-declares a non-zero `font-size`.
 ///
 /// `font-size: 0` on a wrapper is a well-known inline-block/email spacing hack: the wrapper
 /// kills the whitespace between children while each child restores a readable size. Removing
 /// such a subtree would delete genuinely visible text, so the removal is skipped when a
 /// descendant opts back in. This is a one-level-of-inheritance heuristic, not a cascade — a
 /// size restored from a stylesheet is out of reach of a byte-level pass.
-fn region_declares_non_zero_font_size(region: &str) -> bool {
+fn region_restores_visible_content(region: &str) -> bool {
     let bytes = region.as_bytes();
     let len = bytes.len();
     let mut idx = 0;
     while idx < len {
+        if let Some(end) = skip_opaque_region(bytes, idx) {
+            idx = end;
+            continue;
+        }
         if bytes[idx] == b'<' && idx + 1 < len && bytes[idx + 1].is_ascii_alphabetic() {
             if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
-                if tag_sets_non_zero_font_size(&region[idx..tag_end]) {
+                let tag = &region[idx..tag_end];
+                if tag_has_hidden_attribute(tag) || hidden_style_reason(tag) == Some(HiddenStyleReason::Definitive) {
+                    idx = hidden_element_remove_end(bytes, idx, tag_end, len);
+                    continue;
+                }
+                if tag_sets_non_zero_font_size(tag) || matches_tag_start(bytes, idx + 1, b"img") {
                     return true;
                 }
                 idx = tag_end;
