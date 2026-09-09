@@ -12,6 +12,7 @@ tasks:
     desc: "Synchronize version across all package manifests"
     cmds:
       - "{{.ALEF}} sync-versions"
+      - python3 scripts/sync_consumer_versions.py
       # ~keep `alef sync-versions` rewrites MANIFESTS ONLY. Everything generated from the
       # version -- README install snippets, test-app installers, e2e download scripts, stubs,
       # scaffolding -- is produced by separate subcommands, so a bump that stops at
@@ -23,7 +24,7 @@ tasks:
       # `alef docs` is deliberately NOT here. It aborts on doc-snippet typechecking, and when
       # it aborts it has already written the reference pages WITHOUT their `alef:hash:` lines,
       # which flips `alef verify` from pass to fail. Run it separately and deliberately.
-      - "{{.ALEF}} generate"
+      - "{{.ALEF}} generate --skip-compile"
       - "{{.ALEF}} stubs"
       - "{{.ALEF}} scaffold"
       - "{{.ALEF}} readme"
@@ -58,6 +59,7 @@ tasks:
   check:
     desc: "Check if versions are synchronized (dry-run)"
     cmds:
+      - python3 scripts/sync_consumer_versions.py --check
       - cmd: grep -m 1 'version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/'
         silent: false
 

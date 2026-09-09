@@ -1,5 +1,5 @@
 [workspace]
-alef_version = "0.85.0"
+alef_version = "0.85.10"
 languages = [
   "python",
   "node",
@@ -18,6 +18,11 @@ languages = [
   "dart",
   "zig",
 ]
+
+# ~keep Consumer manifests contain maintained toolchain/dependency settings and JNI tasks.
+# Their release dependency pins are updated by scripts/sync_consumer_versions.py.
+[workspace.ownership]
+user_owned = ["test_apps/dart/pubspec.yaml", "test_apps/elixir/mix.exs", "test_apps/kotlin_android/build.gradle.kts"]
 
 [workspace.docs]
 reference_output = "docs-site/src/content/docs/reference"
@@ -269,11 +274,6 @@ search = 'Include="XbergIo.HtmlToMarkdown" Version="[^"]*"'
 replace = 'Include="XbergIo.HtmlToMarkdown" Version="{version}"'
 
 [[workspace.sync.text_replacements]]
-path = "test_apps/php/composer.json"
-search = '"xberg-io/html-to-markdown": "[^"]*"'
-replace = '"xberg-io/html-to-markdown": ">={version}"'
-
-[[workspace.sync.text_replacements]]
 path = "test_apps/python/pyproject.toml"
 search = '"html-to-markdown>=[^"]*"'
 replace = '"html-to-markdown>={python_version}"'
@@ -324,7 +324,8 @@ exclude = [
   "**/vendored/**",
   "**/stopwords/**",
   "**/testdata/**",
-  "e2e/**",
+  "**/e2e/**",
+  "**/fixtures/**",
   "**/*.diff",
   "**/*.patch",
   "**/frb_generated.rs",
@@ -637,9 +638,6 @@ traineddata = "traineddata"
   "nesting-too-deep",
   "too-many-parameters",
 ]
-"crates/html-to-markdown/src/converter/visitor_hooks.rs" = ["too-many-parameters"]
-"crates/html-to-markdown/src/inline_images.rs" = ["too-many-parameters"]
-"crates/html-to-markdown/src/mcp/params.rs" = ["function-too-long"]
 "crates/html-to-markdown/src/metadata/extraction.rs" = ["cyclomatic-complexity", "function-too-long"]
 "crates/html-to-markdown/src/types/structure_builder.rs" = [
   "cyclomatic-complexity",
@@ -1429,78 +1427,78 @@ categories = ["smoke", "conversion"]
 
 [crates.e2e.registry.packages.python]
 name = "html-to-markdown"
-version = ">=3.12.2"
+version = ">=3.12.3"
 
 [crates.e2e.registry.packages.node]
 name = "@xberg-io/html-to-markdown"
-version = "^3.12.2"
+version = "^3.12.3"
 
 [crates.e2e.registry.packages.rust]
 name = "html-to-markdown-rs"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.go]
 module = "github.com/xberg-io/html-to-markdown/packages/go/v3"
-version = "v3.12.2"
+version = "v3.12.3"
 
 [crates.e2e.registry.packages.java]
 name = "io.xberg:html-to-markdown"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.csharp]
 name = "XbergIo.HtmlToMarkdown"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.php]
 name = "xberg-io/html-to-markdown"
-version = ">=3.12.2"
+version = ">=3.12.3"
 
 [crates.e2e.registry.packages.ruby]
 name = "html-to-markdown"
-version = "~> 3.12.2"
+version = "~> 3.12.3"
 
 [crates.e2e.registry.packages.elixir]
 name = "html_to_markdown"
-version = "~> 3.12.2"
+version = "~> 3.12.3"
 
 [crates.e2e.registry.packages.wasm]
 name = "@xberg-io/html-to-markdown-wasm"
-version = "^3.12.2"
+version = "^3.12.3"
 
 [crates.e2e.registry.packages.r]
 name = "htmltomarkdown"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.c]
 name = "html-to-markdown-rs-ffi"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.kotlin_android]
 name = "io.xberg:html-to-markdown-android"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.swift]
 name = "HtmlToMarkdown"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.dart]
 name = "h2m"
-version = "^3.12.2"
+version = "^3.12.3"
 
 [crates.e2e.registry.packages.zig]
 name = "html_to_markdown"
-version = "3.12.2"
-hash = "html-to-markdown-3.12.2-STALE_PLACEHOLDER_TO_BE_RESOLVED_BY_ZIG_FETCH"
+version = "3.12.3"
+hash = "html-to-markdown-3.12.3-STALE_PLACEHOLDER_TO_BE_RESOLVED_BY_ZIG_FETCH"
 
 [crates.e2e.registry.packages.php_ext]
 name = "xberg-io/html-to-markdown"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.registry.packages.homebrew]
 tap = "xberg-io/tap"
 cli_formula = "html-to-markdown"
 ffi_formula = "libhtml-to-markdown"
-version = "3.12.2"
+version = "3.12.3"
 
 [crates.e2e.packages.rust]
 path = "../../crates/html-to-markdown"

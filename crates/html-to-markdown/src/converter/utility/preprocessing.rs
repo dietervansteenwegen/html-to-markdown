@@ -541,7 +541,11 @@ pub fn normalize_split_closing_tags(input: &str) -> Cow<'_, str> {
     let mut output: Option<String> = None;
 
     while idx + 2 < len {
-        if bytes[idx] != b'<' || bytes[idx + 1] != b'/' {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
+        if bytes.get(idx + 1) != Some(&b'/') {
             idx += 1;
             continue;
         }
@@ -963,27 +967,15 @@ pub fn matches_tag_start(bytes: &[u8], mut start: usize, tag: &[u8]) -> bool {
 
 /// Find the end of an HTML tag (the position of '>').
 pub fn find_tag_end(bytes: &[u8], mut idx: usize) -> Option<usize> {
-    let len = bytes.len();
-    let mut in_quote: Option<u8> = None;
-
-    while idx < len {
-        match bytes[idx] {
-            b'"' | b'\'' => {
-                if let Some(current) = in_quote {
-                    if current == bytes[idx] {
-                        in_quote = None;
-                    }
-                } else {
-                    in_quote = Some(bytes[idx]);
-                }
-            }
-            b'>' if in_quote.is_none() => return Some(idx + 1),
-            _ => {}
-        }
+    loop {
+        idx += memchr::memchr3(b'"', b'\'', b'>', bytes.get(idx..)?)?;
+        let delimiter = bytes[idx];
         idx += 1;
+        if delimiter == b'>' {
+            return Some(idx);
+        }
+        idx += memchr::memchr(delimiter, &bytes[idx..])? + 1;
     }
-
-    None
 }
 
 /// Find the closing tag for a given tag name.
@@ -1418,10 +1410,7 @@ fn find_subslice(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
     if from >= haystack.len() {
         return None;
     }
-    haystack[from..]
-        .windows(needle.len())
-        .position(|w| w == needle)
-        .map(|off| from + off)
+    memchr::memmem::find(&haystack[from..], needle).map(|off| from + off)
 }
 
 /// If `<` at `idx` (with `next`/`rest` already read) opens a real HTML comment (`<!--`) or a
@@ -1467,6 +1456,22 @@ fn is_bogus_comment_marker(bytes: &[u8], idx: usize, len: usize, next: u8, rest:
     false
 }
 
+fn has_bogus_comment_candidate(bytes: &[u8]) -> bool {
+    // ~keep Markers inside quotes, comments, or CDATA may produce false positives here;
+    // ~keep the full scanner resolves those. Reject only inputs containing no removal marker.
+    memchr::memchr3_iter(b'?', b'!', b'/', bytes).any(|idx| {
+        if idx == 0 || bytes[idx - 1] != b'<' {
+            return false;
+        }
+        let next = bytes[idx];
+        let rest = &bytes[idx + 1..];
+        if next == b'!' && (rest.starts_with(b"--") || rest.starts_with(b"[CDATA[")) {
+            return false;
+        }
+        is_bogus_comment_marker(bytes, idx - 1, bytes.len(), next, rest)
+    })
+}
+
 /// Remove HTML5 *bogus comments* so they do not leak into the output as text.
 ///
 /// The tokenizer enters the bogus-comment state from three places, and in all of them the
@@ -1492,7 +1497,7 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
     let len = bytes.len();
     // ~keep The shortest bogus comment is two bytes (`<?`, `</`, `<!` at end of input), so
     // ~keep the cheap bail must not be wider than that.
-    if len < 2 || !bytes.contains(&b'<') {
+    if len < 2 || !has_bogus_comment_candidate(bytes) {
         return Cow::Borrowed(input);
     }
 
@@ -1500,10 +1505,10 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
     let mut last = 0;
     let mut output: Option<String> = None;
 
-    while idx < len {
-        if bytes[idx] != b'<' || idx + 1 >= len {
-            idx += 1;
-            continue;
+    while let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) {
+        idx += offset;
+        if idx + 1 >= len {
+            break;
         }
 
         let next = bytes[idx + 1];
@@ -1533,10 +1538,7 @@ pub fn strip_bogus_comments(input: &str) -> Cow<'_, str> {
 
         // ~keep The bogus-comment state ends at the first `>` regardless of quoting, or at
         // ~keep end-of-input if there is none -- unlike a tag, it has no attribute grammar.
-        let end = bytes[idx + 1..]
-            .iter()
-            .position(|&b| b == b'>')
-            .map_or(len, |off| idx + 1 + off + 1);
+        let end = memchr::memchr(b'>', &bytes[idx + 1..]).map_or(len, |off| idx + 1 + off + 1);
         let out = output.get_or_insert_with(|| String::with_capacity(len));
         out.push_str(&input[last..idx]);
         last = end;
@@ -1603,6 +1605,12 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
         return Cow::Borrowed(input);
     }
 
+    // ~keep Every removal requires a `hidden` or `style` attribute; without either
+    // ~keep initial ASCII letter, even malformed or quoted tag-like text cannot match.
+    if memchr::memchr2(b'h', b'H', bytes).is_none() && memchr::memchr2(b's', b'S', bytes).is_none() {
+        return Cow::Borrowed(input);
+    }
+
     // ~keep DoS guard: a run of unterminated `<` (no `>` anywhere in the rest of the
     // ~keep document) makes `find_tag_end` scan to EOF on every single one, turning this
     // ~keep loop quadratic. Once no `>` remains past `idx`, `find_tag_end` is guaranteed
@@ -1615,12 +1623,16 @@ pub fn strip_hidden_elements(input: &str) -> Cow<'_, str> {
     let mut output: Option<String> = None;
 
     while idx < len {
+        let Some(offset) = memchr::memchr(b'<', &bytes[idx..]) else {
+            break;
+        };
+        idx += offset;
         // ~keep A `<` not immediately followed by an ASCII letter can never start a real
         // ~keep HTML tag name (HTML5 tokenizer "tag open state"), so it is never worth a
         // ~keep `find_tag_end` scan. Without this, a run like `<<<<<` treats every `<` as a
         // ~keep candidate tag start, and each failing scan re-walks the same suffix.
         let starts_tag_name = idx + 1 < len && bytes[idx + 1].is_ascii_alphabetic();
-        if bytes[idx] == b'<' && starts_tag_name && last_gt.is_some_and(|gt| gt > idx) {
+        if starts_tag_name && last_gt.is_some_and(|gt| gt > idx) {
             if let Some(tag_end) = find_tag_end(bytes, idx + 1) {
                 if let Some(remove_end) = hidden_element_removal_end(input, bytes, idx, tag_end, len) {
                     let out = output.get_or_insert_with(|| String::with_capacity(len));
@@ -1955,10 +1967,92 @@ fn scan_attribute_value<'a>(bytes: &[u8], tag: &'a str, start: usize) -> (&'a st
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::{
-        find_closing_tag_bytes, find_closing_tag_bytes_nested, normalize_bogus_comment_endings,
-        normalize_split_closing_tags, normalize_unclosed_list_items, sanitize_markdown_url, strip_hidden_elements,
+        find_closing_tag_bytes, find_closing_tag_bytes_nested, find_tag_end, normalize_bogus_comment_endings,
+        normalize_split_closing_tags, normalize_unclosed_list_items, sanitize_markdown_url, strip_bogus_comments,
+        strip_hidden_elements,
     };
+
+    #[test]
+    fn should_find_tag_end_outside_quotes_from_the_requested_byte() {
+        let cases: &[(&[u8], usize, Option<usize>)] = &[
+            (b"", 0, None),
+            (b">", 0, Some(1)),
+            (b">", 1, None),
+            (b">", usize::MAX, None),
+            (b"a>b", 0, Some(2)),
+            (b"'>' >", 0, Some(5)),
+            (b"\"'>'\">", 0, Some(6)),
+            (b"'\" >' >", 0, Some(7)),
+            (b"\"unterminated >", 0, None),
+            (b"\"abc\">", 1, None),
+            (b"\\\">", 0, None),
+            (b"\xff'>\0'\xfe>", 0, Some(7)),
+        ];
+        for &(input, start, expected) in cases {
+            assert_eq!(find_tag_end(input, start), expected, "input: {input:?}, start: {start}");
+        }
+    }
+
+    #[test]
+    fn should_borrow_html_without_bogus_comments() {
+        for input in [
+            "",
+            "<",
+            "é日 text<",
+            "<p title='a<?b>c'>é日</p><",
+            "<!--[if gte mso 9]><?ignored?><![endif]--><p>kept</p>",
+            "<![CDATA[<?not markup>]]><p>kept</p>",
+            "<!DOCTYPE html><p>kept</p>",
+            "<!-- unterminated <?ignored>",
+            "<![CDATA[unterminated <?ignored>",
+        ] {
+            let actual = strip_bogus_comments(input);
+            assert_eq!(actual.as_ref(), input, "input: {input}");
+            assert!(matches!(actual, Cow::Borrowed(_)), "input: {input}");
+        }
+    }
+
+    #[test]
+    fn should_remove_bogus_comments_at_utf8_and_markup_boundaries() {
+        for (input, expected) in [
+            ("é<?a><!b></3>日<", "é日<"),
+            ("<p title='a<?b>c'>é</p><?drop>日", "<p title='a<?b>c'>é</p>日"),
+            ("<!-- <?kept> --><?drop>日", "<!-- <?kept> -->日"),
+            ("<![CDATA[<?kept>]]><?drop>日", "<![CDATA[<?kept>]]>日"),
+            ("é<?'quoted>日", "é日"),
+            ("é<?", "é"),
+            ("é<!", "é"),
+            ("é</", "é"),
+        ] {
+            let actual = strip_bogus_comments(input);
+            assert_eq!(actual.as_ref(), expected, "input: {input}");
+            assert!(matches!(actual, Cow::Owned(_)), "input: {input}");
+        }
+    }
+
+    #[test]
+    fn should_distinguish_bogus_markers_from_recognized_prefixes() {
+        for (input, expected) in [
+            ("é /!? 日", "é /!? 日"),
+            ("<!DOC>é", "é"),
+            ("<!DOCTYPE", "<!DOCTYPE"),
+            ("<!dOcTyPe html><p>é</p>", "<!dOcTyPe html><p>é</p>"),
+            ("<![cdata[x]]>é", "é"),
+            ("<![CDATA[<?x>]]>é", "<![CDATA[<?x>]]>é"),
+            ("<!--<?x>-->é", "<!--<?x>-->é"),
+            ("</é>日", "日"),
+            ("</a>", "</a>"),
+            ("</A>", "</A>"),
+            ("<p title='<!bad><?bad></3>'>é</p>", "<p title='<!bad><?bad></3>'>é</p>"),
+        ] {
+            let actual = strip_bogus_comments(input);
+            assert_eq!(actual.as_ref(), expected, "input: {input}");
+            assert_eq!(matches!(actual, Cow::Borrowed(_)), input == expected, "input: {input}");
+        }
+    }
 
     #[test]
     fn normalize_bogus_comment_endings_leaves_well_formed_comment_unchanged() {
@@ -2019,6 +2113,77 @@ mod tests {
     fn normalize_bogus_comment_endings_empty_input() {
         let result = normalize_bogus_comment_endings("");
         assert_eq!(result.as_ref(), "");
+    }
+
+    #[test]
+    fn should_preserve_hidden_style_markers_without_false_negative_skips() {
+        let cases = [
+            ("<ul><li>a<li>b<li>c</ul>\n", "<ul><li>a<li>b<li>c</ul>\n", false),
+            ("é<div>visible</div>", "é<div>visible</div>", false),
+            ("<b HIDDEN>x</b>", "", true),
+            ("<b STYLE='DISPLAY:NONE'>x</b>", "", true),
+            ("<b style='display:none'>x</b>", "", true),
+            ("<b title='HIDDEN STYLE'>x</b>", "<b title='HIDDEN STYLE'>x</b>", false),
+        ];
+        for (input, expected, owned) in cases {
+            let actual = strip_hidden_elements(input);
+            assert_eq!(actual, expected, "input: {input:?}");
+            assert_eq!(matches!(actual, Cow::Owned(_)), owned, "input: {input:?}");
+        }
+    }
+
+    #[test]
+    fn should_preserve_hidden_element_scan_boundaries_and_borrowing() {
+        let cases = [
+            ("é text<", "é text<", false),
+            ("<span hidden", "<span hidden", false),
+            ("<<span hidden>x</span>終", "<終", true),
+            ("< span hidden>x</ span>", "< span hidden>x</ span>", false),
+            (
+                "<div title='<span hidden>x</span>'>ok</div>",
+                "<div title=''>ok</div>",
+                true,
+            ),
+            ("<i hidden>x</i><b hidden>y</b>z", "z", true),
+            (
+                "<div data-hidden='true'>x</div>",
+                "<div data-hidden='true'>x</div>",
+                false,
+            ),
+            (
+                "<div style='font-size:0'><b style='font-size:12px'>x</b></div>",
+                "<div style='font-size:0'><b style='font-size:12px'>x</b></div>",
+                false,
+            ),
+        ];
+        for (input, expected, owned) in cases {
+            let actual = strip_hidden_elements(input);
+            assert_eq!(actual, expected, "input: {input:?}");
+            assert_eq!(matches!(actual, Cow::Owned(_)), owned, "input: {input:?}");
+        }
+    }
+
+    #[test]
+    fn should_preserve_split_closing_tag_boundaries_and_borrowing() {
+        let cases = [
+            ("é\ntext</", "é\ntext</", false),
+            ("é\ntext<", "é\ntext<", false),
+            ("\n<", "\n<", false),
+            ("\n</</a\n>", "\n</</a>", true),
+            ("\n</a!></b\r\n >", "\n</a!></b>", true),
+            ("é</custom-42\n>終</B\n>", "é</custom-42>終</B>", true),
+            ("\n</a ", "\n</a ", false),
+            ("</a\r>", "</a\r>", false),
+            ("\n</a\r>", "\n</a>", true),
+            ("\n</ a\n>", "\n</ a\n>", false),
+            ("<!-- </a\n> -->", "<!-- </a> -->", true),
+            ("<x a='</b\n>'>", "<x a='</b>'>", true),
+        ];
+        for (input, expected, owned) in cases {
+            let actual = normalize_split_closing_tags(input);
+            assert_eq!(actual, expected, "input: {input:?}");
+            assert_eq!(matches!(actual, Cow::Owned(_)), owned, "input: {input:?}");
+        }
     }
 
     #[test]

@@ -5,7 +5,7 @@
     "input": {
       "html": "<a href=\"/file (1).pdf\">file</a>",
       "options": {
-        "url_escape_style": "angle"
+        "url_escape_style": "Angle"
       }
     },
     "assertions": [
@@ -27,7 +27,7 @@
     "input": {
       "html": "<a href=\"/file (1).pdf\">file</a>",
       "options": {
-        "url_escape_style": "percent"
+        "url_escape_style": "Percent"
       }
     },
     "assertions": [
@@ -54,7 +54,7 @@
     "input": {
       "html": "<a href=\"/file (1) <draft>.pdf\">file</a>",
       "options": {
-        "url_escape_style": "percent"
+        "url_escape_style": "Percent"
       }
     },
     "assertions": [
@@ -76,7 +76,7 @@
     "input": {
       "html": "<img src=\"/img (1) <draft>.png\" alt=\"alt\">",
       "options": {
-        "url_escape_style": "percent"
+        "url_escape_style": "Percent"
       }
     },
     "assertions": [

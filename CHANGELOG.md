@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.3] - 2026-09-09
+
+### Fixed
+
+- Prevent panics when nested list visitors shorten earlier output or replace it with multibyte text
+  ([#474](https://github.com/xberg-io/html-to-markdown/issues/474)).
+- Generate R and Ruby bindings that pass strict Clippy checks while preserving visitor and conversion behavior.
+- Accept explicit `nil` for optional Ruby conversion fields.
+- Use canonical URL-escape enum values in fixtures so Node and WebAssembly suites regenerate completely.
+- Point Ruby dependency-update tasks at the native crate and remove the obsolete duplicate Rust workspace.
+
+### Changed
+
+- Refactor MCP helpers, image construction, and visitor state to remove three lint suppressions while preserving
+  preprocessing validation order ([#466](https://github.com/xberg-io/html-to-markdown/pull/466)).
+- Regenerate all bindings, end-to-end suites, and snippets with Alef 0.85.10.
+- Refresh dependency lockfiles across Rust workspaces.
+
 ## [3.12.2] - 2026-09-07
 
 ### Fixed
