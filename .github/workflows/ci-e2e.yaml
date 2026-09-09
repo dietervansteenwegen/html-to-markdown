@@ -732,7 +732,12 @@ jobs:
 
       - name: Build PHP extension
         id: build-php-extension
-        uses: ./.github/actions/build-php-workspace
+        uses: xberg-io/actions/build-php-extension@v1
+        with:
+          # Keep unreleased core dependencies in the local workspace with its committed lockfile. ~keep
+          rewrite-native-deps: "false"
+          crate-name: html-to-markdown-php
+          lib-name: html_to_markdown_php
 
       - name: Upload PHP extension artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -1123,7 +1128,12 @@ jobs:
 
       - name: Build PHP extension
         id: build-php-extension
-        uses: ./.github/actions/build-php-workspace
+        uses: xberg-io/actions/build-php-extension@v1
+        with:
+          # Keep unreleased core dependencies in the local workspace with its committed lockfile. ~keep
+          rewrite-native-deps: "false"
+          crate-name: html-to-markdown-php
+          lib-name: html_to_markdown_php
 
       - name: Run PHP tests
         run: scripts/ci/php/run-php-tests.sh
