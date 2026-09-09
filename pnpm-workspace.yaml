@@ -1,8 +1,11 @@
 packages:
   - crates/html-to-markdown-node
+  - crates/html-to-markdown-node/npm/*
   - crates/html-to-markdown-wasm
   - e2e/node
   - e2e/wasm
+
+linkWorkspacePackages: true
 
 onlyBuiltDependencies:
   - esbuild
